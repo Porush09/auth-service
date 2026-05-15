@@ -7,7 +7,7 @@ pipeline {
         AWS_REGION     = "ap-south-1"
 
         // --- CHANGE THIS LINE FOR EACH SERVICE ---
-        SERVICE_NAME   = "auth-service"
+        SERVICE_NAME   = "yt-auth-service"
 
         ECR_REPO_URL   = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${SERVICE_NAME}"
     }
