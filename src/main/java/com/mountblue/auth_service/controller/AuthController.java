@@ -25,19 +25,8 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public LoginResponseDto login(@RequestBody LoginRequestDto dto,
-                                  HttpServletResponse response) {
-
-        LoginResponseDto loginResponse = authService.login(dto);
-
-        Cookie cookie = new Cookie("JWT_TOKEN", loginResponse.getToken());
-        cookie.setHttpOnly(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(24 * 60 * 60);
-
-        response.addCookie(cookie);
-
-        return loginResponse;
+    public LoginResponseDto login(@RequestBody LoginRequestDto dto) {
+        return authService.login(dto);
     }
 
     @PostMapping("/logout")
