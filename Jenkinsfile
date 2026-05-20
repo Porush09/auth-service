@@ -54,20 +54,14 @@ pipeline {
         stage('Update Git Manifest') {
             steps {
                 script {
-                    // Wrap in a credentials block using your Jenkins GitHub Token ID
-                    // Make sure 'github-token' matches the ID of your secret text/credential in Jenkins
-                    withCredentials([string(credentialsId: 'github-token', variable: 'GH_TOKEN')]) {
+                    withCredentials([usernamePassword(credentialsId: 'github-gitops-token', usernameVariable: 'GH_USER', passwordVariable: 'GH_TOKEN')]) {
 
-                        // 1. Clean any old directory if it exists and clone your manifests repository
                         sh "rm -rf yt-clone-gitops-manifests"
-                        sh "git clone https://${GH_TOKEN}@github.com/porushyadav/yt-clone-gitops-manifests.git"
+                        sh "git clone https://${GH_TOKEN}@github.com/Porush09/yt-clone-gitops-manifests.git"
 
                         dir('yt-clone-gitops-manifests') {
-                            // 2. Use sed to replace the old image tag with our new dynamic IMAGE_TAG
-                            // This looks for 'yt-auth-service:anything' and replaces it with 'yt-auth-service:vBuildNum'
                             sh "sed -i 's|${SERVICE_NAME}:.*|${SERVICE_NAME}:${IMAGE_TAG}|g' ${MANIFEST_FILE}"
 
-                            // 3. Configure git and push the updated manifest file back to GitHub
                             sh """
                                 git config user.name "Jenkins-CI"
                                 git config user.email "jenkins@mountblue.com"
