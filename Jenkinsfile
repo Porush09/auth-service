@@ -2,27 +2,29 @@ pipeline {
     agent any
 
     environment {
-        // Automatically pulls the 12-digit ID you saved in Jenkins System settings
         AWS_ACCOUNT_ID = "${env.AWS_ACCOUNT_ID}"
         AWS_REGION     = "ap-south-1"
 
-        // --- CHANGE THIS LINE FOR EACH SERVICE ---
+        // --- SERVICE CONFIGURATION ---
         SERVICE_NAME   = "yt-auth-service"
+        // This targets the specific file inside your manifests repository
+        MANIFEST_FILE  = "apps/auth-service.yaml"
 
         ECR_REPO_URL   = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${SERVICE_NAME}"
+
+        // This creates a unique identifier for this specific build (e.g., v12, v13)
+        IMAGE_TAG      = "v${env.BUILD_NUMBER}"
     }
 
     stages {
         stage('Checkout') {
             steps {
-                // Pulls the code from your GitHub Repo
                 checkout scm
             }
         }
 
         stage('Maven Build') {
             steps {
-                // Using the Maven Wrapper from your project root
                 sh "chmod +x mvnw"
                 sh "./mvnw clean package -DskipTests"
             }
@@ -31,11 +33,8 @@ pipeline {
         stage('Docker Build & Tag') {
             steps {
                 script {
-                    // Builds the image on the EC2 (Intel/AMD architecture)
-                    sh "docker build -t ${SERVICE_NAME} ."
-
-                    // Tags the image for ECR
-                    sh "docker tag ${SERVICE_NAME}:latest ${ECR_REPO_URL}:latest"
+                    // Build the local image using your specific build version
+                    sh "docker build -t ${ECR_REPO_URL}:${IMAGE_TAG} ."
                 }
             }
         }
@@ -43,11 +42,41 @@ pipeline {
         stage('Push to ECR') {
             steps {
                 script {
-                    // Authenticate Jenkins with ECR using the EC2's IAM Role
+                    // Authenticate with ECR
                     sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
-                    // Push the 'latest' image to your repository
-                    sh "docker push ${ECR_REPO_URL}:latest"
+                    // Push ONLY the unique version tag to ECR
+                    sh "docker push ${ECR_REPO_URL}:${IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('Update Git Manifest') {
+            steps {
+                script {
+                    // Wrap in a credentials block using your Jenkins GitHub Token ID
+                    // Make sure 'github-token' matches the ID of your secret text/credential in Jenkins
+                    withCredentials([string(credentialsId: 'github-token', variable: 'GH_TOKEN')]) {
+
+                        // 1. Clean any old directory if it exists and clone your manifests repository
+                        sh "rm -rf yt-clone-gitops-manifests"
+                        sh "git clone https://${GH_TOKEN}@github.com/porushyadav/yt-clone-gitops-manifests.git"
+
+                        dir('yt-clone-gitops-manifests') {
+                            // 2. Use sed to replace the old image tag with our new dynamic IMAGE_TAG
+                            // This looks for 'yt-auth-service:anything' and replaces it with 'yt-auth-service:vBuildNum'
+                            sh "sed -i 's|${SERVICE_NAME}:.*|${SERVICE_NAME}:${IMAGE_TAG}|g' ${MANIFEST_FILE}"
+
+                            // 3. Configure git and push the updated manifest file back to GitHub
+                            sh """
+                                git config user.name "Jenkins-CI"
+                                git config user.email "jenkins@mountblue.com"
+                                git add ${MANIFEST_FILE}
+                                git commit -m "chore: automated image tag update for ${SERVICE_NAME} to ${IMAGE_TAG} [skip ci]"
+                                git push origin main
+                            """
+                        }
+                    }
                 }
             }
         }
@@ -55,12 +84,9 @@ pipeline {
 
     post {
         success {
-            echo "Successfully pushed ${SERVICE_NAME} to ECR!"
-            // Optional: Clean up the image from the EC2 to save disk space
-            sh "docker rmi ${SERVICE_NAME}:latest ${ECR_REPO_URL}:latest || true"
-        }
-        failure {
-            echo "Pipeline failed! Check the console output for errors."
+            echo "Successfully pushed ${SERVICE_NAME}:${IMAGE_TAG} to ECR!"
+            // Clean up the local worker space using the exact version tag
+            sh "docker rmi ${ECR_REPO_URL}:${IMAGE_TAG} || true"
         }
     }
 }
