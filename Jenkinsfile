@@ -23,13 +23,6 @@ pipeline {
             }
         }
 
-        stage('Maven Build') {
-            steps {
-                sh "chmod +x mvnw"
-                sh "./mvnw clean package -DskipTests"
-            }
-        }
-
         stage('Docker Build & Tag') {
             steps {
                 script {
