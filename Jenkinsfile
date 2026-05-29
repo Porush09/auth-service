@@ -2,15 +2,19 @@ pipeline {
     agent any
 
     environment {
-            // --- LOCAL CONFIGURATION ---
-            REGISTRY_URL = "172.17.0.1:5000"
-            SERVICE_NAME   = "yt-auth-service"
-            MANIFEST_FILE  = "apps/auth-service.yaml"
+        AWS_ACCOUNT_ID = credentials('AWS_ACCOUNT_ID')
+        AWS_REGION     = "ap-south-1"
 
-            // Local image mapping string
-            LOCAL_IMAGE    = "${REGISTRY_URL}/${SERVICE_NAME}"
-            IMAGE_TAG      = "v${env.BUILD_NUMBER}"
-        }
+        // --- SERVICE CONFIGURATION ---
+        SERVICE_NAME   = "yt-auth-service"
+        // This targets the specific file inside your manifests repository
+        MANIFEST_FILE  = "apps/auth-service.yaml"
+
+        ECR_REPO_URL   = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${SERVICE_NAME}"
+
+        // This creates a unique identifier for this specific build (e.g., v12, v13)
+        IMAGE_TAG      = "v${env.BUILD_NUMBER}"
+    }
 
     stages {
         stage('Checkout') {
@@ -22,17 +26,20 @@ pipeline {
         stage('Docker Build & Tag') {
             steps {
                 script {
-                    // It MUST use LOCAL_IMAGE, not ECR_REPO_URL
-                    sh "docker build -t ${LOCAL_IMAGE}:${IMAGE_TAG} ."
+                    // Build the local image using your specific build version
+                    sh "docker build -t ${ECR_REPO_URL}:${IMAGE_TAG} ."
                 }
             }
         }
 
-        stage('Push to Minikube Registry') {
+        stage('Push to ECR') {
             steps {
                 script {
-                    // No AWS authentication required! Just push directly through the open port
-                    sh "docker push ${LOCAL_IMAGE}:${IMAGE_TAG}"
+                    // Authenticate with ECR
+                    sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+                    // Push ONLY the unique version tag to ECR
+                    sh "docker push ${ECR_REPO_URL}:${IMAGE_TAG}"
                 }
             }
         }
@@ -46,7 +53,7 @@ pipeline {
                         sh "git clone https://${GH_TOKEN}@github.com/Porush09/yt-clone-gitops-manifests.git"
 
                         dir('yt-clone-gitops-manifests') {
-                            sh "sed -i '' 's|${SERVICE_NAME}:.*|${SERVICE_NAME}:${IMAGE_TAG}|g' ${MANIFEST_FILE}"
+                            sh "sed -i 's|${SERVICE_NAME}:.*|${SERVICE_NAME}:${IMAGE_TAG}|g' ${MANIFEST_FILE}"
 
                             sh """
                                 git config user.name "Jenkins-CI"
