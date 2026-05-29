@@ -3,7 +3,7 @@ pipeline {
 
     environment {
             // --- LOCAL CONFIGURATION ---
-            REGISTRY_URL = "localhost:5000"
+            REGISTRY_URL = "172.17.0.1:5000"
             SERVICE_NAME   = "yt-auth-service"
             MANIFEST_FILE  = "apps/auth-service.yaml"
 
