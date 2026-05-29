@@ -28,14 +28,11 @@ pipeline {
             }
         }
 
-        stage('Push to ECR') {
+        stage('Push to Minikube Registry') {
             steps {
                 script {
-                    // Authenticate with ECR
-                    sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-
-                    // Push ONLY the unique version tag to ECR
-                    sh "docker push ${ECR_REPO_URL}:${IMAGE_TAG}"
+                    // No AWS authentication required! Just push directly through the open port
+                    sh "docker push ${LOCAL_IMAGE}:${IMAGE_TAG}"
                 }
             }
         }
