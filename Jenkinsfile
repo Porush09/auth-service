@@ -2,19 +2,15 @@ pipeline {
     agent any
 
     environment {
-        AWS_ACCOUNT_ID = credentials('AWS_ACCOUNT_ID')
-        AWS_REGION     = "ap-south-1"
+            // --- LOCAL CONFIGURATION ---
+            REGISTRY_URL   = "localhost:50409"
+            SERVICE_NAME   = "yt-auth-service"
+            MANIFEST_FILE  = "apps/auth-service.yaml"
 
-        // --- SERVICE CONFIGURATION ---
-        SERVICE_NAME   = "yt-auth-service"
-        // This targets the specific file inside your manifests repository
-        MANIFEST_FILE  = "apps/auth-service.yaml"
-
-        ECR_REPO_URL   = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${SERVICE_NAME}"
-
-        // This creates a unique identifier for this specific build (e.g., v12, v13)
-        IMAGE_TAG      = "v${env.BUILD_NUMBER}"
-    }
+            // Local image mapping string
+            LOCAL_IMAGE    = "${REGISTRY_URL}/${SERVICE_NAME}"
+            IMAGE_TAG      = "v${env.BUILD_NUMBER}"
+        }
 
     stages {
         stage('Checkout') {
@@ -53,7 +49,7 @@ pipeline {
                         sh "git clone https://${GH_TOKEN}@github.com/Porush09/yt-clone-gitops-manifests.git"
 
                         dir('yt-clone-gitops-manifests') {
-                            sh "sed -i 's|${SERVICE_NAME}:.*|${SERVICE_NAME}:${IMAGE_TAG}|g' ${MANIFEST_FILE}"
+                            sh "sed -i '' 's|${SERVICE_NAME}:.*|${SERVICE_NAME}:${IMAGE_TAG}|g' ${MANIFEST_FILE}"
 
                             sh """
                                 git config user.name "Jenkins-CI"
