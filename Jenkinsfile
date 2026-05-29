@@ -22,8 +22,8 @@ pipeline {
         stage('Docker Build & Tag') {
             steps {
                 script {
-                    // Build the local image using your specific build version
-                    sh "docker build -t ${ECR_REPO_URL}:${IMAGE_TAG} ."
+                    // It MUST use LOCAL_IMAGE, not ECR_REPO_URL
+                    sh "docker build -t ${LOCAL_IMAGE}:${IMAGE_TAG} ."
                 }
             }
         }
